@@ -38,6 +38,76 @@ bool check_address(string s) {
 	return output;
 }
 
+vector<int> accel_data;
+vector<int> gyro_data;
+
+void split_data(unsigned char *data) {
+	int tempx, tempy, tempz;
+	if (data[0] == 'a') {
+		accel_data.clear();
+		for (int i = 2; i < 7; i++) {
+			tempx = tempx * 10;
+			tempx += data[i] - '0';
+		}
+		for (int i = 8; i < 13; i++) {
+			tempy = tempy * 10;
+			tempy += data[i] - '0';			
+		}
+		for (int i = 14; i < 19; i++) {
+			tempz = tempz * 10;
+			tempz += data[i] - '0';			
+		}
+		if (data[1] == '-') {
+			tempx = -1 * tempx;
+		}
+		if (data[7] == '-') {
+			tempy = -1 * tempy;
+		}
+		if (data[13] == '-') {
+			tempz = -1 * tempz;
+		}
+		accel_data.push_back(tempx);
+		accel_data.push_back(tempy);
+		accel_data.push_back(tempz);
+		return;
+	}
+	else if (data[0] == 'g') {
+		gyro_data.clear();
+		for (int i = 2; i < 7; i++) {
+			tempx = tempx * 10;
+			tempx += data[i] - '0';
+		}
+		for (int i = 8; i < 13; i++) {
+			tempy = tempy * 10;
+			tempy += data[i] - '0';			
+		}
+		for (int i = 14; i < 19; i++) {
+			tempz = tempz * 10;
+			tempz += data[i] - '0';			
+		}
+		if (data[1] == '-') {
+			tempx = -1 * tempx;
+		}
+		if (data[7] == '-') {
+			tempy = -1 * tempy;
+		}
+		if (data[13] == '-') {
+			tempz = -1 * tempz;
+		}
+		gyro_data.push_back(tempx);
+		gyro_data.push_back(tempy);
+		gyro_data.push_back(tempz);		
+		return;
+	}
+	else if (data[0] == '[') {
+		return;
+	}
+	else {
+		cout << "wrong data structure" << endl;
+		return;
+	}
+}
+
 int main(int argc, char **argv) 
 {
 
@@ -139,6 +209,7 @@ int main(int argc, char **argv)
 	else {
 		cout << "UUID_LIST is empty" << endl;
 	}
+	/*
 	auto data_list = sensor_tag->get_service_data();
 	if (!data_list.empty()) {
 		cout << "I HAVE DATA" << endl;
@@ -146,21 +217,20 @@ int main(int argc, char **argv)
 	else {
 		cout << "NO DATA" << endl;
 	}
-	
+	*/
 	std::string service_uuid("6e400001-b5a3-f393-e0a9-e50e24dcca9e");
 	cout << "Waiting for service " << service_uuid << " to be discovered" << endl;
 	auto tinyb_service = sensor_tag->find(&service_uuid);
-
+/*
 	cout << "Stopping Discovery... " << endl;
 	ret = manager->stop_discovery();
 	cout << "Discovery Stopped" << endl;	
-
+*/
     cout << "getting tx_uuid" << endl;
     auto tx_uuid = string("6e400003-b5a3-f393-e0a9-e50e24dcca9e");
     auto tx_service = tinyb_service->find(&tx_uuid);
        
     cout << "while loop here lmao" << endl;
-    
     
     while(1) {
 		try {
@@ -175,12 +245,22 @@ int main(int argc, char **argv)
 			else {
 				data = response.data();
 				
-				cout << "raw data = " << endl;
+				cout << "raw data = ";
 				for (unsigned i = 0; i < size; i++) {
-					cout << std::hex << static_cast<int>(data[i]);
+					cout << data[i];
+					//cout << std::hex << static_cast<int>(data[i]);
+				}			
+				split_data(data);
+				cout << "    converted data = ";
+				for (int i = 0; i < 3; i++) {
+					if (data[0] == 'a') {	
+						cout << accel_data[i];
+					}
+					else if (data[0] == 'g') {
+						cout << gyro_data[i];
+					}
 				}
 				cout << endl;
-				
 			}
 		}
 		catch (exception &e) {

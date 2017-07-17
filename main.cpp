@@ -277,12 +277,12 @@ int main(void)
                 //LOG("GYRO: %i, %i, %i\r\n", gyro[0], gyro[1], gyro[2]);
             }
             //string s = "[" + custom_to_char(accel[0]) + "," + custom_to_char(accel[1]) + "," + custom_to_char(accel[2]) + "," + custom_to_char(gyro[0]) + "," + custom_to_char(gyro[1]) + "," + custom_to_char(gyro[2]) + "]";
-            string a_string = "[a" + custom_to_char(accel[0]) + custom_to_char(accel[1]) + custom_to_char(accel[2]); 
+            string a_string = "a" + custom_to_char(accel[0]) + custom_to_char(accel[1]) + custom_to_char(accel[2]) + "]"; 
             string g_string = "g" + custom_to_char(gyro[0]) + custom_to_char(gyro[1]) + custom_to_char(gyro[2]) + "]";
-            LOG("%i\r\n", tick_counter);
-            //LOG("String s: %s %s\r\n", a_string, g_string);
+            		
+			//LOG("String s: %s %s\r\n", a_string, g_string);
             //char s[] = "[" + custom_to_char(accel[0]) + "]"; // + "," + accel[1] + "," + accel[2] + "," + gyro[0] + "," + gyro[1] + "," + gyro[2] + "]";
-            /*
+            
             const char *astr = a_string.c_str();//"kellog\n";
             const char *gstr = g_string.c_str();
             if (lastSent == 1) {
@@ -293,10 +293,14 @@ int main(void)
                 uartService.writeString(gstr);
                 lastSent = 1;
             }
-            */
+            /*
+			LOG("%i\r\n", tick_counter);
             string count_string = counter_to_char(tick_counter);
             const char *s = count_string.c_str();
             uartService.writeString(s);
+			*/
+			
+			
             currentCount = tick_counter;
             motion_event = 0;
         }
