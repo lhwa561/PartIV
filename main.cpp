@@ -283,7 +283,7 @@ int main(void)
 			//LOG("String s: %s %s\r\n", a_string, g_string);
             //char s[] = "[" + custom_to_char(accel[0]) + "]"; // + "," + accel[1] + "," + accel[2] + "," + gyro[0] + "," + gyro[1] + "," + gyro[2] + "]";
             
-            const char *astr = a_string.c_str();//"kellog\n";
+            const char *astr = a_string.c_str();
             const char *gstr = g_string.c_str();
             if (lastSent == 1) {
                 uartService.writeString(astr);

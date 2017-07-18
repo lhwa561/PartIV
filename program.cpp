@@ -42,7 +42,9 @@ vector<int> accel_data;
 vector<int> gyro_data;
 
 void split_data(unsigned char *data) {
-	int tempx, tempy, tempz;
+	int tempx = 0;
+	int tempy = 0;
+	int tempz = 0;
 	if (data[0] == 'a') {
 		accel_data.clear();
 		for (int i = 2; i < 7; i++) {
@@ -161,12 +163,12 @@ int main(int argc, char **argv)
 					sensor_tag = (*it).release();
 //					sensor_tag->connect();
 				}
-				/*
-				if ((*it)->get_address() == "F1:98:00:E3:2D:9C") {
+				
+				if ((*it)->get_address() == "F2:60:3B:58:BA:EC") {
 					cout << "address found" << endl;
 					sensor_tag = (*it).release();
-					sensor_tag->connect();
-				}	*/
+					//sensor_tag->connect();
+				}
 			}
 		}
 		
