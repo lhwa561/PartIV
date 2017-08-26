@@ -1,4 +1,6 @@
 #include <string>
+#include <cmath>
+#include <stdio.h>
 
 #include "mbed.h"
 #include "mbed_i2c.h"
@@ -61,45 +63,26 @@ unsigned short inv_orientation_matrix_to_scalar( const signed char *mtx);
 
 void connectionCallback(const Gap::ConnectionCallbackParams_t *params)
 {
-    LOG("Connected!\n");
+    //LOG("Connected!\n");
     bleIsConnected = true;
 }
 
 void disconnectionCallback(const Gap::DisconnectionCallbackParams_t *cbParams)
 {
-    LOG("Disconnected!\n");
-    LOG("Restarting the advertising process\n");
+    //LOG("Disconnected!\n");
+    //LOG("Restarting the advertising process\n");
     ble.startAdvertising();
     bleIsConnected = false;
 }
-uint32_t tick_counter = 0;
+//uint32_t tick_counter = 0;
+bool ticked = false;
 void tick(void)
 {
 //    static uint32_t count = 0;
-    tick_counter++;
+    //tick_counter++;
 //    LOG("%d\r\n", count++);
     green = !green;
-}
-
-void detect(void)
-{
-//    LOG("Button pressed\r\n");  
-    blue = !blue;
-}
-
-void motion_interrupt_handle(void)
-{
-    motion_event = 1;
-}
-
-void tap_cb(unsigned char direction, unsigned char count)
-{
-//    LOG("Tap motion detected\r\n");
-}
-
-void android_orient_cb(unsigned char orientation)
-{
-//    LOG("Oriention changed\r\n");
+    ticked = true;
 }
 
 int size_of(int input) {
@@ -136,6 +119,23 @@ string custom_to_char(int input) {
     return output;
 }
 
+string custom_to_char1(int input) {
+//    LOG("CURRENT INPUT IS: %i \r\n" ,input);
+    int temp = input;
+    char output[] = "+000";
+    if (temp < 0) {
+        temp = -1 * temp;
+        output[0] = '-';
+    }
+    //int size = size_of(temp);
+    
+    for (int i = 3; i > 0; i--) {
+        output[i] = temp%10 + '0';
+        temp = temp/10;
+    }
+    return output;
+}
+
 string counter_to_char(int count) {
     char output[] = "[000000000000000000]";
     int size = size_of(count);
@@ -154,6 +154,18 @@ string counter_to_char(int count) {
         
     return output;
 }
+
+double quat_convert(float input) {
+    double output = 0;
+    int temp = 0;
+    
+    temp = input / 100000;
+    
+    output = temp/10000.0;
+    
+    return output;
+}
+
 int main(void)
 {
     blue  = 1;
@@ -164,14 +176,14 @@ int main(void)
     
     wait(1);
     
-    LOG("---- Seeed Tiny BLE ----\r\n");
+    //LOG("---- Seeed Tiny BLE ----\r\n");
     
     mbed_i2c_clear(MPU6050_SDA, MPU6050_SCL);
     mbed_i2c_init(MPU6050_SDA, MPU6050_SCL);
     
 
     if (mpu_init(0)) {
-        LOG("failed to initialize mpu6050\r\n");
+        //LOG("failed to initialize mpu6050\r\n");
     }
     
     /* Get/set hardware configuration. Start gyro. */
@@ -179,7 +191,8 @@ int main(void)
     mpu_set_sensors(INV_XYZ_GYRO | INV_XYZ_ACCEL);
     /* Push both gyro and accel data into the FIFO. */
     mpu_configure_fifo(INV_XYZ_GYRO | INV_XYZ_ACCEL);
-    mpu_set_sample_rate(DEFAULT_MPU_HZ);
+    mpu_set_sample_rate(100);
+    //mpu_set_sample_rate(DEFAULT_MPU_HZ);
     
     /* Read back configuration in case it was set improperly. */
     unsigned char accel_fsr;
@@ -188,36 +201,23 @@ int main(void)
     mpu_get_gyro_fsr(&gyro_fsr);
     mpu_get_accel_fsr(&accel_fsr);
     
-    LOG("accel fsr: %d \r\n", accel_fsr);
-    LOG("gyro fsr: %d \r\n", gyro_fsr);
+    //LOG("accel fsr: %d \r\n", accel_fsr);
+    //LOG("gyro fsr: %d \r\n", gyro_fsr);
     
     dmp_load_motion_driver_firmware();
     dmp_set_orientation(
         inv_orientation_matrix_to_scalar(board_orientation));
-    dmp_register_tap_cb(tap_cb);
-    dmp_register_android_orient_cb(android_orient_cb);
     
-    uint16_t dmp_features = DMP_FEATURE_6X_LP_QUAT | DMP_FEATURE_TAP |
-                       DMP_FEATURE_ANDROID_ORIENT | DMP_FEATURE_SEND_RAW_ACCEL | DMP_FEATURE_SEND_CAL_GYRO |
+    uint16_t dmp_features = DMP_FEATURE_6X_LP_QUAT | DMP_FEATURE_SEND_RAW_ACCEL | DMP_FEATURE_SEND_CAL_GYRO |
                        DMP_FEATURE_GYRO_CAL;
     dmp_enable_feature(dmp_features);
     dmp_set_fifo_rate(DEFAULT_MPU_HZ);
     mpu_set_dmp_state(1);
     
-    dmp_set_interrupt_mode(DMP_INT_GESTURE);
-    dmp_set_tap_thresh(TAP_XYZ, 50);
-    
-    
-    motion_probe.fall(motion_interrupt_handle);
-
-
-    
     Ticker ticker;
-    ticker.attach(tick, 0.1);
+    ticker.attach(tick, 0.05);
 
-    button.fall(detect);
-
-    LOG("Initialising the nRF51822\r\n");
+    //LOG("Initialising the nRF51822\r\n");
     ble.init();
     ble.gap().onDisconnection(disconnectionCallback);
     ble.gap().onConnection(connectionCallback);
@@ -237,81 +237,157 @@ int main(void)
  
     ble.setAdvertisingInterval(160); /* 100ms; in multiples of 0.625ms. */
     ble.gap().startAdvertising();
-    
-    char r[4];
-    r[1]='\r';
-    r[2]='\n';
-    r[3]='\0';
-    
+
     int lastSent = 0;
+    //int CalcCounter = 0;
+    //int CountBuffer = 10000;    
+    double t = 0.05;
+    double t2 = 0.0025;
+    
+    double sX, sY, sZ, uX, uY, uZ;
+    uX = 0;
+    uY = 0;
+    uZ = 0;
+    sX = 0;
+    sY = 0;
+    sZ = 0;
+    //double qDivider = 1000000000.0;
+    float aDivider = 16384/9.81;
+    float gDivider = 16.4;
+    double aX, aY, aZ, gX, gY, gZ;
+    double q0, q1, q2, q3;
+    double _2q0, _2q1, _2q2, _2q3;
+    double ytemp1, ytemp2, ptemp, rtemp1, rtemp2;
+    //double norm;
+    double roll, pitch, yaw;
+    double gtempX, gtempY, gtempZ, aFilt;
+    gtempX = 0;
+    gtempY = 0;
+    gtempZ = 0;
+    aFilt = 0.15;
     
     while (true) {
-        //LOG("WHILE TRUE\r\n");
-        static uint32_t currentCount = 0;
-        
-        if (tick_counter > currentCount/*motion_event*/) {\
-            int c;      
-            r[0]=c=uartService._getc();
-            if (c<=0) {
-                if (c == 'R' || c == 'r'){
-                    red = 0;
-                }
-                else {
-                    r[0] = '?';
-                }
-            }
-            //LOG("C: %c \r\n", r[0]);
-            
+        if (ticked) {
+            //CalcCounter = 0;
+            ticked = false;
             unsigned long sensor_timestamp;
             short gyro[3], accel[3], sensors;
             long quat[4];
             unsigned char more = 1;
             
             dmp_read_fifo(gyro, accel, quat, &sensor_timestamp, &sensors, &more);
-            if (accel_fsr == 2) {
-                //16384
-                //LOG("ACC: %i, %i, %i\r\n", accel[0], accel[1], accel[2]);                
-            }
-            if (gyro_fsr == 2000) {
-                //16.4
-                //LOG("GYRO: %i, %i, %i\r\n", gyro[0], gyro[1], gyro[2]);
-            }
-            //string s = "[" + custom_to_char(accel[0]) + "," + custom_to_char(accel[1]) + "," + custom_to_char(accel[2]) + "," + custom_to_char(gyro[0]) + "," + custom_to_char(gyro[1]) + "," + custom_to_char(gyro[2]) + "]";
-            string a_string = "a" + custom_to_char(accel[0]) + custom_to_char(accel[1]) + custom_to_char(accel[2]) + "]"; 
-            string g_string = "g" + custom_to_char(gyro[0]) + custom_to_char(gyro[1]) + custom_to_char(gyro[2]) + "]";
-            		
-			//LOG("String s: %s %s\r\n", a_string, g_string);
-            //char s[] = "[" + custom_to_char(accel[0]) + "]"; // + "," + accel[1] + "," + accel[2] + "," + gyro[0] + "," + gyro[1] + "," + gyro[2] + "]";
             
-            const char *astr = a_string.c_str();
-            const char *gstr = g_string.c_str();
+                        
+            aX = accel[0]/aDivider;
+            aY = accel[1]/aDivider;
+            aZ = accel[2]/aDivider;
+            gX = gyro[0]/gDivider;
+            gY = gyro[1]/gDivider;
+            gZ = gyro[2]/gDivider;            
+            
+            q0 = quat_convert(quat[0]);
+            q1 = quat_convert(quat[1]);
+            q2 = quat_convert(quat[2]);
+            q3 = quat_convert(quat[3]);
+            
+            /*
+            q0 = quat[0]/qDivider;
+            q1 = quat[1]/qDivider;
+            q2 = quat[2]/qDivider;
+            q3 = quat[3]/qDivider;
+            */
+            _2q0 = q0*q0;
+            _2q1 = q1*q1;
+            _2q2 = q2*q2;
+            _2q3 = q3*q3;
+            
+            ytemp1 = 2*q1*q2 - 2*q0*q3;
+            ytemp2 = 2*(_2q0) + 2*(_2q1) - 1;
+            ptemp = 2*q1*q3 + 2*q0*q2;
+            rtemp1 = 2*q2*q3 - 2*q0*q1;
+            rtemp2 = 2*(_2q0) + 2*(_2q3) - 1;
+            /*
+            norm = 1/(sqrt(_2q0+_2q1+_2q2+_2q3));
+            
+            ytemp1 = ytemp1*norm;
+            ytemp2 = ytemp2*norm;
+            ptemp = ptemp*norm;
+            rtemp1 = rtemp1*norm;
+            rtemp2 = rtemp2*norm;
+            */
+            yaw = atan2(ytemp1, ytemp2);
+            pitch = -asin(ptemp);
+            roll = atan2(rtemp1, rtemp2);
+            
+            gtempX = (1-aFilt)*gtempX + aFilt*aX;
+            aX = aX - gtempX;
+            /*if ((aX < aFilt) && (aX > (0-aFilt))) {
+                aX = 0;
+            }
+            */
+            
+            sX = uX*t + aX * t2;
+            uX = uX + aX * t;
+            
+            gtempY = (1-aFilt)*gtempY + aFilt*aY;
+            aY = aY - gtempY;
+            /*if ((aY < aFilt) && (aY > (0-aFilt))) {
+                aY = 0;
+            }
+            */
+            sY = uY*t + aY * t2;
+            uY = uY + aY * t;
+            
+            gtempZ = (1-aFilt)*gtempZ + aFilt*aZ;
+            aZ = aZ - gtempZ;
+            /*if ((aZ < aFilt) && (aZ > (0-aFilt))) {
+                aZ = 0;
+            }
+            */
+            sZ = uZ*t + aZ * t2;
+            uZ = uZ + aZ * t;
+                      
+            LOG("x: %f, y: %f, z: %f\r\n", sX, sY, sZ);
+            
+            //LOG("w: %d, x: %d, y: %d, z: %d \r\n", quat[0]/qDivider, quat[1]/qDivider, quat[2]/qDivider, quat[3]/qDivider);
+            //LOG("w: %f, x: %f, y: %f, z: %f \r\n", q0, q1, q2, q3);          
+            //LOG("aX = %f, sX = %f, uX = %f\r\n", aX, sX*100, uX);
+             
+            //LOG("roll: %f, pitch: %f, yaw: %f\r\n", roll, pitch, yaw);
+            //string a_string = "a" + custom_to_char(accel[0]) + custom_to_char(accel[1]) + custom_to_char(accel[2]) + "]"; 
+            //string g_string = "g" + custom_to_char(gyro[0]) + custom_to_char(gyro[1]) + custom_to_char(gyro[2]) + "]";     
+            /*
+            int qDivider1 = 10000000;
+            int q0temp = quat[0]/qDivider1;
+            int q1temp = quat[1]/qDivider1;
+            int q2temp = quat[2]/qDivider1;
+            int q3temp = quat[3]/qDivider1;
+            
+            string q_string = "q" + custom_to_char1(q0temp) + custom_to_char1(q1temp) + custom_to_char1(q2temp) + custom_to_char1(q3temp) + "ab]";
+            
+            const char *qstr = q_string.c_str();
+            uartService.writeString(qstr);
+            */
+            string s_string = "s" + custom_to_char(sX*10000) + custom_to_char(sY*10000) + custom_to_char(sZ*10000) + "]"; 
+            string e_string = "e" + custom_to_char(roll*10000) + custom_to_char(pitch*10000) + custom_to_char(yaw*10000) + "]";
+            const char *sstr = s_string.c_str();
+            const char *estr = e_string.c_str();
+            //LOG("String s: %s %s \r\n", a_string, g_string);
+            //const char *astr = a_string.c_str();
+            //const char *gstr = g_string.c_str();
+            
             if (lastSent == 1) {
-                uartService.writeString(astr);
+                uartService.writeString(sstr);
                 lastSent = 0;
             }
             else {
-                uartService.writeString(gstr);
+                uartService.writeString(estr);
                 lastSent = 1;
             }
-            /*
-			LOG("%i\r\n", tick_counter);
-            string count_string = counter_to_char(tick_counter);
-            const char *s = count_string.c_str();
-            uartService.writeString(s);
-			*/
-			
-			
-            currentCount = tick_counter;
-            motion_event = 0;
-        }
-         
-        if (motion_event) {
             
-            motion_event = 0;
         }
         else {
-            //LOG("WAITING FOR EVENT\r\n");
-            ble.waitForEvent();
+            //CalcCounter++;
         }
     }
 }
