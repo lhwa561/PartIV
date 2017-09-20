@@ -6,11 +6,15 @@
 #include <iomanip>
 #include <stdint.h>
 #include <tinyb.hpp>
+#include <iomanip>
 
 #include <vector>
 #include <thread>
 #include <atomic>
 #include <csignal>
+
+#include <fstream>
+#include <iostream>
 
 using namespace tinyb;
 using namespace std;
@@ -38,15 +42,17 @@ bool check_address(string s) {
 	return output;
 }
 
-vector<int> accel_data;
-vector<int> gyro_data;
+vector<int> s_data;
+vector<int> s_prev;
+vector<int> e_data;
+vector<int> e_prev;
 
 void split_data(unsigned char *data) {
 	int tempx = 0;
-	int tempy = 0;
+	int tempy = 0; 
 	int tempz = 0;
-	if (data[0] == 'a') {
-		accel_data.clear();
+	if (data[0] == 's') {
+		s_data.clear();
 		for (int i = 2; i < 7; i++) {
 			tempx = tempx * 10;
 			tempx += data[i] - '0';
@@ -68,13 +74,15 @@ void split_data(unsigned char *data) {
 		if (data[13] == '-') {
 			tempz = -1 * tempz;
 		}
-		accel_data.push_back(tempx);
-		accel_data.push_back(tempy);
-		accel_data.push_back(tempz);
+		
+		//cout << tempx << ", " << tempy << ", " << tempz;// << endl;
+		s_data.push_back(tempx);
+		s_data.push_back(tempy);
+		s_data.push_back(tempz);
 		return;
 	}
-	else if (data[0] == 'g') {
-		gyro_data.clear();
+	else if (data[0] == 'e') {
+		e_data.clear();
 		for (int i = 2; i < 7; i++) {
 			tempx = tempx * 10;
 			tempx += data[i] - '0';
@@ -96,9 +104,10 @@ void split_data(unsigned char *data) {
 		if (data[13] == '-') {
 			tempz = -1 * tempz;
 		}
-		gyro_data.push_back(tempx);
-		gyro_data.push_back(tempy);
-		gyro_data.push_back(tempz);		
+		//cout << tempx << ", " << tempy << ", " << tempz;// << endl;
+		e_data.push_back(tempx);
+		e_data.push_back(tempy);
+		e_data.push_back(tempz);		
 		return;
 	}
 	else if (data[0] == '[') {
@@ -107,6 +116,18 @@ void split_data(unsigned char *data) {
 	else {
 		cout << "wrong data structure" << endl;
 		return;
+	}
+}
+
+void ReadCin(atomic<bool>& run) {
+	string buffer;
+	
+	while (run.load()) {
+		cin >> buffer;
+		
+		if (buffer == "e") {
+			run.store(false);
+		}
 	}
 }
 
@@ -163,8 +184,7 @@ int main(int argc, char **argv)
 					sensor_tag = (*it).release();
 //					sensor_tag->connect();
 				}
-				
-				if ((*it)->get_address() == "F2:60:3B:58:BA:EC") {
+				else if ((*it)->get_address() == "F2:60:3B:58:BA:EC") {
 					cout << "address found" << endl;
 					sensor_tag = (*it).release();
 					//sensor_tag->connect();
@@ -195,7 +215,7 @@ int main(int argc, char **argv)
 	std::this_thread::sleep_for(std::chrono::seconds(4));
 	auto service_list = sensor_tag->get_services();
 	if (!service_list.empty()) {
-		cout << "Service List size: " << service_list.size() << endl;
+		cout << "Service List size: " << service_list.size() + 1<< endl;
 	}
 	else {
 		cout << "Service List is empty" << endl;
@@ -231,45 +251,139 @@ int main(int argc, char **argv)
     cout << "getting tx_uuid" << endl;
     auto tx_uuid = string("6e400003-b5a3-f393-e0a9-e50e24dcca9e");
     auto tx_service = tinyb_service->find(&tx_uuid);
-       
-    cout << "while loop here lmao" << endl;
     
-    while(1) {
+    
+    int num = 1;
+    
+    ofstream output_file("LOG/output" + to_string(num) + ".txt"); 
+    
+	if (!output_file.is_open()) {
+		cout << "Error opening output file" << endl;
+		return 0;
+	}
+    
+    
+    cout << "while loop here lmao" << endl;
+    /*
+    bool exit = false;
+    char key = ' ';
+    */
+    
+    bool init = true;
+    int sec = 0;
+    atomic<bool> run(true);
+    thread cinThread(ReadCin, ref(run));
+    
+    //system("exec rm -r LOG/*");
+      
+    while(run.load()) {
+		/*
+		cin >> key;
+		if (key == 'e') {
+			exit = true;
+			cout << "EXIT" << endl;
+			return 0;
+		}
+		*/
 		try {
+			/*
+			if (num == 5) {
+				
+			}
+			
+			ofstream output_file("LOG/output" + to_string(num) + ".txt"); 
+			num++;
+			if (!output_file.is_open()) {
+				cout << "Error opening output file" << endl;
+				return 0;
+			}
+			*/
 			std::vector<unsigned char> response = tx_service->read_value();
 			
 			unsigned char *data;
 			unsigned int size = response.size();
-			
 			if (size <= 0) {
-				cout << "FUCK THIS SHIT ITS NOT WORKING" << endl;
+				cout << "NO DATA COMING IN" << endl;
 			}
 			else {
+				
 				data = response.data();
 				
-				cout << "raw data = ";
+				//cout << "raw data = "; //<< data << endl;
+				
+				/*
 				for (unsigned i = 0; i < size; i++) {
 					cout << data[i];
 					//cout << std::hex << static_cast<int>(data[i]);
-				}			
+				}
+				*/			
 				split_data(data);
-				cout << "    converted data = ";
-				for (int i = 0; i < 3; i++) {
-					if (data[0] == 'a') {	
-						cout << accel_data[i];
+				if (!init) {
+					if (sec < 10 && (s_prev == s_data || e_prev == e_data)) {
+						sec++;
+						//cout << sec << endl;
 					}
-					else if (data[0] == 'g') {
-						cout << gyro_data[i];
+					else {
+						sec = 0;
+						s_prev = s_data;
+						e_prev = e_data;
+						cout << "converted data = ";
+						cout << s_data[0] << " " << s_data[1] << " " << s_data[2] << " ";
+						cout << e_data[0] << " " << e_data[1] << " " << e_data[2] << endl;
+						
+						output_file  << s_data[0]/10000.0 << " " << s_data[1]/10000.0 << " " << s_data[2]/10000.0 << " "  << e_data[0]/10000.0 << " " << e_data[1]/10000.0 << " " << e_data[2]/10000.0 << endl;
 					}
 				}
-				cout << endl;
+				else {					
+					if (!s_data.empty() && !e_data.empty()) {
+						init = false;
+					}
+				}
+				/*
+				for (int i = 0; i < 3; i++) {
+					if (data[0] == 's') {
+						if (i == 0) {
+							cout << "s";
+							output_file << "s";
+						}
+						cout << setprecision(2) << fixed << s_data[i]/10000.0;
+						output_file << s_data[i];// << ',';
+					}
+					else if (data[0] == 'e') {
+						if (i == 0) {
+							cout << "e";
+							output_file << "e";
+						}
+						cout << setprecision(2) << fixed << e_data[i]/10000.0;
+						output_file << e_data[i];// << ',';
+					}
+					
+					if (i != 2) {
+						output_file << ',';
+						cout << ", ";
+					}
+				}
+				*/
+				//cout << endl;
+				
+				//output_file.close();
+			
+			
+				//output_file << "\n";
 			}
 		}
 		catch (exception &e) {
-			cout << "ERROR" << endl;
-			break;
+			cout << "ERROR: " << e.what() << endl;
+			//output_file.close();
+			sensor_tag->disconnect();
+			//break;
 		}
 	}
-    
+	output_file.close();
+    cout << "OH WOW" << endl;
+	run.store(false);
+	cinThread.join();
+	
 	return 0;
 }
+//sudo ./src/catkin/bin/catkin_make_isolated --install -DCMAKE_BUILD_TYPE=Release --install-space /opt/ros/indigo -j2
