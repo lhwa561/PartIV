@@ -215,7 +215,7 @@ int main(void)
     mpu_set_dmp_state(1);
     
     Ticker ticker;
-    ticker.attach(tick, 0.05);
+    ticker.attach(tick, 0.01);
 
     //LOG("Initialising the nRF51822\r\n");
     ble.init();
@@ -241,6 +241,7 @@ int main(void)
     int lastSent = 0;
     //int CalcCounter = 0;
     //int CountBuffer = 10000;    
+
     double t = 0.05;
     double t2 = 0.0025;
     
@@ -251,6 +252,7 @@ int main(void)
     sX = 0;
     sY = 0;
     sZ = 0;
+
     //double qDivider = 1000000000.0;
     float aDivider = 16384/9.81;
     float gDivider = 16.4;
@@ -264,8 +266,42 @@ int main(void)
     gtempX = 0;
     gtempY = 0;
     gtempZ = 0;
-    aFilt = 0.15;
+    aFilt = 0.2;
     
+//    int fCount = 0;
+    int sCount = 0;
+    
+    double saX[10] = {0,0,0,0,0,0,0,0,0,0};
+    double saY[10] = {0,0,0,0,0,0,0,0,0,0};
+    double saZ[10] = {0,0,0,0,0,0,0,0,0,0};
+    
+    double vfX[10] = {0,0,0,0,0,0,0,0,0,0};
+    double vfY[10] = {0,0,0,0,0,0,0,0,0,0};
+    double vfZ[10] = {0,0,0,0,0,0,0,0,0,0};
+    
+    double sfX, sfY, sfZ;
+    sfX = 0;
+    sfY = 0;
+    sfZ = 0;
+    
+    string s_string = "s+00000+00000+00000]";
+    string e_string = "e+00000+00000+00000]";
+    double tX, tY, tZ;
+    tX = 0;
+    tY = 0;
+    tZ = 0;
+    double p, q, r, k, x;
+    p = 0;
+    q = 0.2;
+    r = 0.2;
+    k = 0;
+    x = 0;
+    int rotation = 0;
+    float rotVar = 0;
+    int stationary = false;
+    //double pos[3] = {0,0,0};
+    //double vel[3] = {0,0,0};
+    //double velDrift[3] = {0,0,0};
     while (true) {
         if (ticked) {
             //CalcCounter = 0;
@@ -289,13 +325,7 @@ int main(void)
             q1 = quat_convert(quat[1]);
             q2 = quat_convert(quat[2]);
             q3 = quat_convert(quat[3]);
-            
-            /*
-            q0 = quat[0]/qDivider;
-            q1 = quat[1]/qDivider;
-            q2 = quat[2]/qDivider;
-            q3 = quat[3]/qDivider;
-            */
+
             _2q0 = q0*q0;
             _2q1 = q1*q1;
             _2q2 = q2*q2;
@@ -321,70 +351,111 @@ int main(void)
             
             gtempX = (1-aFilt)*gtempX + aFilt*aX;
             aX = aX - gtempX;
-            /*if ((aX < aFilt) && (aX > (0-aFilt))) {
-                aX = 0;
-            }
-            */
-            
-            sX = uX*t + aX * t2;
-            uX = uX + aX * t;
             
             gtempY = (1-aFilt)*gtempY + aFilt*aY;
             aY = aY - gtempY;
-            /*if ((aY < aFilt) && (aY > (0-aFilt))) {
-                aY = 0;
-            }
-            */
-            sY = uY*t + aY * t2;
-            uY = uY + aY * t;
-            
+                    
             gtempZ = (1-aFilt)*gtempZ + aFilt*aZ;
             aZ = aZ - gtempZ;
-            /*if ((aZ < aFilt) && (aZ > (0-aFilt))) {
-                aZ = 0;
-            }
-            */
-            sZ = uZ*t + aZ * t2;
-            uZ = uZ + aZ * t;
-                      
-            LOG("x: %f, y: %f, z: %f\r\n", sX, sY, sZ);
-            
-            //LOG("w: %d, x: %d, y: %d, z: %d \r\n", quat[0]/qDivider, quat[1]/qDivider, quat[2]/qDivider, quat[3]/qDivider);
-            //LOG("w: %f, x: %f, y: %f, z: %f \r\n", q0, q1, q2, q3);          
-            //LOG("aX = %f, sX = %f, uX = %f\r\n", aX, sX*100, uX);
-             
-            //LOG("roll: %f, pitch: %f, yaw: %f\r\n", roll, pitch, yaw);
-            //string a_string = "a" + custom_to_char(accel[0]) + custom_to_char(accel[1]) + custom_to_char(accel[2]) + "]"; 
-            //string g_string = "g" + custom_to_char(gyro[0]) + custom_to_char(gyro[1]) + custom_to_char(gyro[2]) + "]";     
+        
             /*
-            int qDivider1 = 10000000;
-            int q0temp = quat[0]/qDivider1;
-            int q1temp = quat[1]/qDivider1;
-            int q2temp = quat[2]/qDivider1;
-            int q3temp = quat[3]/qDivider1;
-            
-            string q_string = "q" + custom_to_char1(q0temp) + custom_to_char1(q1temp) + custom_to_char1(q2temp) + custom_to_char1(q3temp) + "ab]";
-            
-            const char *qstr = q_string.c_str();
-            uartService.writeString(qstr);
+            kalman filter
+            x = x
+            p = p + q;
+
+            k = p / (p + r);
+            x = x + k * (measurement – x);
+            p = (1 – k) * p;
             */
-            string s_string = "s" + custom_to_char(sX*10000) + custom_to_char(sY*10000) + custom_to_char(sZ*10000) + "]"; 
-            string e_string = "e" + custom_to_char(roll*10000) + custom_to_char(pitch*10000) + custom_to_char(yaw*10000) + "]";
-            const char *sstr = s_string.c_str();
-            const char *estr = e_string.c_str();
-            //LOG("String s: %s %s \r\n", a_string, g_string);
-            //const char *astr = a_string.c_str();
-            //const char *gstr = g_string.c_str();
+            double accMag = sqrt(aX*aX + aY*aY + aZ*aZ);
+            p = p + q;
+            k = p/(p + r);
+            x = x + k*(accMag - x);
+            p = (1 - k)*p;
             
-            if (lastSent == 1) {
-                uartService.writeString(sstr);
-                lastSent = 0;
+            double gyroMag = sqrt(gX*gX + gY*gY + gZ*gZ);
+            if (x < 1) {
+                stationary = true;
             }
             else {
-                uartService.writeString(estr);
-                lastSent = 1;
+                stationary = false;
+            }
+            //LOG("%f\r\n", gyroMag);
+            
+            if (gyroMag < 50) {
+                rotation = 0;
+            }
+            else if (gyroMag < 100) {
+                rotation = 1;
+            }
+            else {
+                rotation = 2;
             }
             
+            saX[0] = saX[1];
+            saY[0] = saY[1];
+            saZ[0] = saZ[1];
+            
+            vfX[0] = vfX[1];
+            vfY[0] = vfY[1];
+            vfZ[0] = vfZ[1];
+            
+            if (!stationary) {
+                if (rotation == 0) {
+                    rotVar = 1;
+                }
+                else if (rotation == 1) {
+                    rotVar = 0.2;
+                }
+                else {
+                    rotVar = 0;
+                }
+                saX[1] = aX * rotVar;
+                saY[1] = aY * rotVar;
+                saZ[1] = aZ * rotVar;
+            }
+            else {
+               saX[1] = 0;
+               saY[1] = 0;
+               saZ[1] = 0;              
+            }
+            vfX[1] = 0.5 * 0.01 * (saX[0] + saX[1]);
+            vfY[1] = 0.5 * 0.01 * (saY[0] + saY[1]);
+            vfZ[1] = 0.5 * 0.01 * (saZ[0] + saZ[1]);
+                
+            //LOG("%f %f %f\r\n",vfX[1], vfY[1], vfZ[1]);
+            
+            sfX = 0.5 * (vfX[0] + vfX[1]);
+            sfY = 0.5 * (vfY[0] + vfY[1]);
+            sfZ = 0.5 * (vfZ[0] + vfZ[1]);
+        
+            if (sCount < 100) {
+                const char *sstr = s_string.c_str();
+                const char *estr = e_string.c_str();
+                
+                if (lastSent == 1) {
+                    uartService.writeString(sstr);
+                    lastSent = 0;
+                }
+                else {
+                    uartService.writeString(estr);
+                    lastSent = 1;
+                }
+                sCount++;
+                tX += sfX;
+                tY += sfY;
+                tZ += sfZ;
+            }
+            else {
+                LOG("%f %f %f %f %f %f\r\n", tX*100, tY*100, tZ*100, roll, pitch, yaw);
+                s_string = "s" + custom_to_char(tX*10000) + custom_to_char(tY*10000) + custom_to_char(tZ*10000) + "]"; 
+                e_string = "e" + custom_to_char(roll*10000) + custom_to_char(pitch*10000) + custom_to_char(yaw*10000) + "]";
+                tX = 0;
+                tY = 0;
+                tZ = 0;
+                sCount = 0;
+            }
+
         }
         else {
             //CalcCounter++;
