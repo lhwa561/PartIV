@@ -239,8 +239,6 @@ int main(void)
     ble.gap().startAdvertising();
 
     int lastSent = 0;
-    //int CalcCounter = 0;
-    //int CountBuffer = 10000;    
 
     double t = 0.05;
     double t2 = 0.0025;
@@ -253,14 +251,13 @@ int main(void)
     sY = 0;
     sZ = 0;
 
-    //double qDivider = 1000000000.0;
     float aDivider = 16384/9.81;
     float gDivider = 16.4;
     double aX, aY, aZ, gX, gY, gZ;
     double q0, q1, q2, q3;
     double _2q0, _2q1, _2q2, _2q3;
     double ytemp1, ytemp2, ptemp, rtemp1, rtemp2;
-    //double norm;
+  
     double roll, pitch, yaw;
     double gtempX, gtempY, gtempZ, aFilt;
     gtempX = 0;
@@ -268,7 +265,6 @@ int main(void)
     gtempZ = 0;
     aFilt = 0.2;
     
-//    int fCount = 0;
     int sCount = 0;
     
     double saX[10] = {0,0,0,0,0,0,0,0,0,0};
@@ -299,12 +295,9 @@ int main(void)
     int rotation = 0;
     float rotVar = 0;
     int stationary = false;
-    //double pos[3] = {0,0,0};
-    //double vel[3] = {0,0,0};
-    //double velDrift[3] = {0,0,0};
+    
     while (true) {
         if (ticked) {
-            //CalcCounter = 0;
             ticked = false;
             unsigned long sensor_timestamp;
             short gyro[3], accel[3], sensors;
@@ -336,19 +329,12 @@ int main(void)
             ptemp = 2*q1*q3 + 2*q0*q2;
             rtemp1 = 2*q2*q3 - 2*q0*q1;
             rtemp2 = 2*(_2q0) + 2*(_2q3) - 1;
-            /*
-            norm = 1/(sqrt(_2q0+_2q1+_2q2+_2q3));
             
-            ytemp1 = ytemp1*norm;
-            ytemp2 = ytemp2*norm;
-            ptemp = ptemp*norm;
-            rtemp1 = rtemp1*norm;
-            rtemp2 = rtemp2*norm;
-            */
             yaw = atan2(ytemp1, ytemp2);
             pitch = -asin(ptemp);
             roll = atan2(rtemp1, rtemp2);
             
+            /*Gravity Filter*/
             gtempX = (1-aFilt)*gtempX + aFilt*aX;
             aX = aX - gtempX;
             
@@ -374,14 +360,16 @@ int main(void)
             p = (1 - k)*p;
             
             double gyroMag = sqrt(gX*gX + gY*gY + gZ*gZ);
+            
+            //Determine if motion has occured or not
             if (x < 1) {
                 stationary = true;
             }
             else {
                 stationary = false;
             }
-            //LOG("%f\r\n", gyroMag);
-            
+
+            //Determine if Rotation has occured or not
             if (gyroMag < 50) {
                 rotation = 0;
             }
@@ -392,14 +380,17 @@ int main(void)
                 rotation = 2;
             }
             
+            //Set last acc as old acc            
             saX[0] = saX[1];
             saY[0] = saY[1];
             saZ[0] = saZ[1];
             
+            //Set last vel as old vel
             vfX[0] = vfX[1];
             vfY[0] = vfY[1];
             vfZ[0] = vfZ[1];
             
+            //Scale the accelerometer values if rotation is occuring and motion is happening
             if (!stationary) {
                 if (rotation == 0) {
                     rotVar = 1;
@@ -428,8 +419,10 @@ int main(void)
             sfX = 0.5 * (vfX[0] + vfX[1]);
             sfY = 0.5 * (vfY[0] + vfY[1]);
             sfZ = 0.5 * (vfZ[0] + vfZ[1]);
-        
+            
+            //count for 100
             if (sCount < 100) {
+                //Print the last set output displacements
                 const char *sstr = s_string.c_str();
                 const char *estr = e_string.c_str();
                 
@@ -447,6 +440,7 @@ int main(void)
                 tZ += sfZ;
             }
             else {
+                //Set the output displacemenet for the next second
                 LOG("%f %f %f %f %f %f\r\n", tX*100, tY*100, tZ*100, roll, pitch, yaw);
                 s_string = "s" + custom_to_char(tX*10000) + custom_to_char(tY*10000) + custom_to_char(tZ*10000) + "]"; 
                 e_string = "e" + custom_to_char(roll*10000) + custom_to_char(pitch*10000) + custom_to_char(yaw*10000) + "]";
