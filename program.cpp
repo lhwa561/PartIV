@@ -30,6 +30,7 @@ void signal_handler(int signum)
 
 vector<string> list_of_tiny;
 
+//Checks if the connected BLE device is one of our Tiny BLEs
 bool check_address(string s) {
 	bool output = false;
 	
@@ -47,6 +48,7 @@ vector<int> s_prev;
 vector<int> e_data;
 vector<int> e_prev;
 
+//Parses the data into X, Y, Z
 void split_data(unsigned char *data) {
 	int tempx = 0;
 	int tempy = 0; 
@@ -74,13 +76,13 @@ void split_data(unsigned char *data) {
 		if (data[13] == '-') {
 			tempz = -1 * tempz;
 		}
-		
-		//cout << tempx << ", " << tempy << ", " << tempz;// << endl;
+
 		s_data.push_back(tempx);
 		s_data.push_back(tempy);
 		s_data.push_back(tempz);
 		return;
 	}
+	//Parses the Euler values roll, pitch, yaw
 	else if (data[0] == 'e') {
 		e_data.clear();
 		for (int i = 2; i < 7; i++) {
@@ -104,7 +106,7 @@ void split_data(unsigned char *data) {
 		if (data[13] == '-') {
 			tempz = -1 * tempz;
 		}
-		//cout << tempx << ", " << tempy << ", " << tempz;// << endl;
+
 		e_data.push_back(tempx);
 		e_data.push_back(tempy);
 		e_data.push_back(tempz);		
@@ -161,7 +163,6 @@ int main(int argc, char **argv)
 	list_of_tiny.push_back("F2:60:3B:58:BA:EC");
 	
 	vector<unique_ptr<BluetoothDevice>> list_devices;
-	//for (int i = 0; i < 15; i++) {
 	while(1) {
 //		cout << "Discovered Devices: " << endl;
 		list_devices = manager->get_devices();
@@ -182,12 +183,10 @@ int main(int argc, char **argv)
 				if ((*it)->get_address() == "E2:48:FF:ED:4E:3D") {
 					cout << "E2:48:FF:ED:4E:3D address found" << endl;
 					sensor_tag = (*it).release();
-//					sensor_tag->connect();
 				}
 				else if ((*it)->get_address() == "F2:60:3B:58:BA:EC") {
 					cout << "address found" << endl;
 					sensor_tag = (*it).release();
-					//sensor_tag->connect();
 				}
 			}
 		}
@@ -231,23 +230,11 @@ int main(int argc, char **argv)
 	else {
 		cout << "UUID_LIST is empty" << endl;
 	}
-	/*
-	auto data_list = sensor_tag->get_service_data();
-	if (!data_list.empty()) {
-		cout << "I HAVE DATA" << endl;
-	}
-	else {
-		cout << "NO DATA" << endl;
-	}
-	*/
+
 	std::string service_uuid("6e400001-b5a3-f393-e0a9-e50e24dcca9e");
 	cout << "Waiting for service " << service_uuid << " to be discovered" << endl;
 	auto tinyb_service = sensor_tag->find(&service_uuid);
-/*
-	cout << "Stopping Discovery... " << endl;
-	ret = manager->stop_discovery();
-	cout << "Discovery Stopped" << endl;	
-*/
+
     cout << "getting tx_uuid" << endl;
     auto tx_uuid = string("6e400003-b5a3-f393-e0a9-e50e24dcca9e");
     auto tx_service = tinyb_service->find(&tx_uuid);
@@ -262,12 +249,7 @@ int main(int argc, char **argv)
 		return 0;
 	}
     
-    
-    cout << "while loop here lmao" << endl;
-    /*
-    bool exit = false;
-    char key = ' ';
-    */
+
     
     bool init = true;
     int sec = 0;
@@ -275,29 +257,12 @@ int main(int argc, char **argv)
     thread cinThread(ReadCin, ref(run));
     
     //system("exec rm -r LOG/*");
-      
+    
+    cout << "Starting Data Input Stream..." << endl;
+          
     while(run.load()) {
-		/*
-		cin >> key;
-		if (key == 'e') {
-			exit = true;
-			cout << "EXIT" << endl;
-			return 0;
-		}
-		*/
 		try {
-			/*
-			if (num == 5) {
-				
-			}
-			
-			ofstream output_file("LOG/output" + to_string(num) + ".txt"); 
-			num++;
-			if (!output_file.is_open()) {
-				cout << "Error opening output file" << endl;
-				return 0;
-			}
-			*/
+
 			std::vector<unsigned char> response = tx_service->read_value();
 			
 			unsigned char *data;
@@ -307,16 +272,7 @@ int main(int argc, char **argv)
 			}
 			else {
 				
-				data = response.data();
-				
-				//cout << "raw data = "; //<< data << endl;
-				
-				/*
-				for (unsigned i = 0; i < size; i++) {
-					cout << data[i];
-					//cout << std::hex << static_cast<int>(data[i]);
-				}
-				*/			
+				data = response.data();		
 				split_data(data);
 				if (!init) {
 					if (sec < 10 && (s_prev == s_data || e_prev == e_data)) {
@@ -339,48 +295,16 @@ int main(int argc, char **argv)
 						init = false;
 					}
 				}
-				/*
-				for (int i = 0; i < 3; i++) {
-					if (data[0] == 's') {
-						if (i == 0) {
-							cout << "s";
-							output_file << "s";
-						}
-						cout << setprecision(2) << fixed << s_data[i]/10000.0;
-						output_file << s_data[i];// << ',';
-					}
-					else if (data[0] == 'e') {
-						if (i == 0) {
-							cout << "e";
-							output_file << "e";
-						}
-						cout << setprecision(2) << fixed << e_data[i]/10000.0;
-						output_file << e_data[i];// << ',';
-					}
-					
-					if (i != 2) {
-						output_file << ',';
-						cout << ", ";
-					}
-				}
-				*/
-				//cout << endl;
-				
-				//output_file.close();
-			
-			
-				//output_file << "\n";
 			}
 		}
 		catch (exception &e) {
 			cout << "ERROR: " << e.what() << endl;
-			//output_file.close();
 			sensor_tag->disconnect();
-			//break;
-		}
+			}
 	}
+	sensor_tag->disconnect();
 	output_file.close();
-    cout << "OH WOW" << endl;
+    cout << "Closing Program.cpp" << endl;
 	run.store(false);
 	cinThread.join();
 	
